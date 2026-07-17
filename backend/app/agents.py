@@ -18,10 +18,17 @@ from langgraph.graph import StateGraph, END
 from .tools import web_search, format_search_results
 
 MODEL = os.environ.get("AGENT_MODEL", "gemini-2.5-flash")
-client = genai.Client(api_key=os.environ.get("GEMINI_API_KEY"))
+
+
+def get_client():
+    api_key = os.environ.get("GEMINI_API_KEY")
+    if not api_key:
+        raise ValueError("GEMINI_API_KEY must be set to call the Google AI API.")
+    return genai.Client(api_key=api_key)
 
 
 def call_llm(system: str, user: str, max_tokens: int = 1200) -> str:
+    client = get_client()
     resp = client.models.generate_content(
         model=MODEL,
         contents=user,
