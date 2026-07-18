@@ -1,4 +1,4 @@
-# TraceMind 🤖
+# TraceMind 
 
 A small, transparent **multi-agent** system: a Planner, Researcher, Writer, and
 Reviewer agent collaborate — via a [LangGraph](https://github.com/langchain-ai/langgraph)
