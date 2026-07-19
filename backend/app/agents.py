@@ -11,7 +11,7 @@ for contributors to extend with new agents (e.g. a "fact_checker" node).
 import logging
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from typing import TypedDict, List
+from typing import TypedDict, List, Optional
 
 from google import genai
 from google.genai import types
@@ -24,12 +24,12 @@ from .config import settings
 logger = logging.getLogger(__name__)
 
 MODEL = settings.gemini_model
+TRANSIENT_HTTP_CODES = frozenset({429, 500, 502, 503, 504})
 _client = None
-
-_TRANSIENT_CODES = frozenset({429, 500, 502, 503, 504})
 
 
 def _get_client():
+    """Lazily initialize and return a singleton Gemini client."""
     global _client
     if _client is None:
         _client = genai.Client(api_key=settings.gemini_api_key)
@@ -37,14 +37,31 @@ def _get_client():
 
 
 def _is_retryable(exc: Exception) -> bool:
+    """Return True if an API exception is transient and worth retrying."""
     if isinstance(exc, ServerError):
-        return exc.code in _TRANSIENT_CODES
+        return exc.code in TRANSIENT_HTTP_CODES
     if isinstance(exc, APIError):
-        return exc.code in _TRANSIENT_CODES
+        return exc.code in TRANSIENT_HTTP_CODES
     return isinstance(exc, (TimeoutError, ConnectionError, OSError))
 
 
 def call_llm(system: str, user: str, max_tokens: int = 1200) -> str:
+    """Generate a response from the LLM with retry and timeout logic.
+
+    Retries transient failures using exponential backoff. Raises
+    RuntimeError if all attempts fail.
+
+    Args:
+        system: System prompt defining the agent's role.
+        user: User prompt or aggregated context.
+        max_tokens: Maximum tokens for the model output.
+
+    Returns:
+        The generated text, or an empty string if the model returns no content.
+
+    Raises:
+        RuntimeError: If the maximum number of retry attempts is exhausted.
+    """
     last_exc = None
     for attempt in range(1, settings.gemini_retry_attempts + 1):
         try:
@@ -87,7 +104,14 @@ def call_llm(system: str, user: str, max_tokens: int = 1200) -> str:
     )
 
 
+def _format_note(question: str, content: str) -> str:
+    """Format a sub-question result for inclusion in the research summary."""
+    return f"Sub-question: {question}\n{content}"
+
+
 class GraphState(TypedDict):
+    """Shared state passed between graph nodes."""
+
     topic: str
     sub_questions: List[str]
     research_notes: str
@@ -99,6 +123,7 @@ class GraphState(TypedDict):
 
 
 def planner_node(state: GraphState) -> GraphState:
+    """Decompose the topic into 3-4 focused sub-questions for deeper research."""
     system = (
         "You are the Planner agent in a research crew. Break the user's topic "
         "into 3-4 focused sub-questions that, if answered, would let a writer "
@@ -118,13 +143,17 @@ def planner_node(state: GraphState) -> GraphState:
 
 
 def researcher_node(state: GraphState) -> GraphState:
+    """Run concurrent web searches for each sub-question and summarize results.
+
+    Deterministic ordering is preserved regardless of completion order.
+    Partial failures are logged and included as error notes.
+    """
     sub_questions = state.get("sub_questions", [])
     notes: List[str] = []
 
     if sub_questions:
         logger.info("Starting %d concurrent research task(s)", len(sub_questions))
-
-        ordered_results = [None] * len(sub_questions)
+        ordered_results: List[Optional[str]] = [None] * len(sub_questions)
 
         with ThreadPoolExecutor(max_workers=min(8, len(sub_questions))) as executor:
             future_to_index = {}
@@ -146,8 +175,8 @@ def researcher_node(state: GraphState) -> GraphState:
                         duration,
                         len(results),
                     )
-                    ordered_results[index] = (
-                        f"Sub-question: {question}\n{format_search_results(results)}"
+                    ordered_results[index] = _format_note(
+                        question, format_search_results(results)
                     )
                 except Exception as exc:
                     logger.error(
@@ -156,10 +185,11 @@ def researcher_node(state: GraphState) -> GraphState:
                         exc,
                         exc_info=True,
                     )
-                    ordered_results[index] = (
-                        f"Sub-question: {question}\nSearch failed: {exc}"
+                    ordered_results[index] = _format_note(
+                        question, f"Search failed: {exc}"
                     )
 
+        # All indices are populated; filter Nones only as a safeguard.
         notes = [note for note in ordered_results if note is not None]
 
     combined = "\n\n".join(notes)
@@ -179,6 +209,7 @@ def researcher_node(state: GraphState) -> GraphState:
 
 
 def writer_node(state: GraphState) -> GraphState:
+    """Draft or revise the report based on research notes and prior feedback."""
     system = (
         "You are the Writer agent. Using the research notes provided, write a "
         "clear, well-structured short report (use markdown headings) answering "
@@ -197,6 +228,7 @@ def writer_node(state: GraphState) -> GraphState:
 
 
 def reviewer_node(state: GraphState) -> GraphState:
+    """Critically evaluate the draft and approve or request revisions."""
     system = (
         "You are the Reviewer agent, a critical editor. Check the draft for "
         "factual gaps, unclear structure, or unsupported claims. "
@@ -219,7 +251,10 @@ def reviewer_node(state: GraphState) -> GraphState:
 
 
 def route_after_review(state: GraphState) -> str:
-    # Only allow a single revision cycle so the graph always terminates quickly.
+    """Return the next node after review based on approval status.
+
+    Only one revision cycle is allowed to ensure the graph terminates.
+    """
     if state["approved"] or state.get("revised"):
         return "end"
     state["revised"] = True
@@ -227,6 +262,7 @@ def route_after_review(state: GraphState) -> str:
 
 
 def build_graph():
+    """Construct and compile the LangGraph state graph."""
     graph = StateGraph(GraphState)
     graph.add_node("planner", planner_node)
     graph.add_node("researcher", researcher_node)
@@ -247,6 +283,7 @@ _compiled_graph = None
 
 
 def get_graph():
+    """Return the compiled graph, initializing it on first access."""
     global _compiled_graph
     if _compiled_graph is None:
         _compiled_graph = build_graph()
@@ -254,6 +291,14 @@ def get_graph():
 
 
 def run_crew(topic: str) -> GraphState:
+    """Run the research crew end-to-end for the given topic.
+
+    Args:
+        topic: The subject or question to research.
+
+    Returns:
+        The final graph state containing the draft, notes, and execution history.
+    """
     initial_state: GraphState = {
         "topic": topic,
         "sub_questions": [],
