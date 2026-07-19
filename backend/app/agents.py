@@ -282,7 +282,6 @@ def build_graph():
 
 _compiled_graph = None
 
-
 def get_graph():
     """Return the compiled graph, initializing it on first access."""
     global _compiled_graph
