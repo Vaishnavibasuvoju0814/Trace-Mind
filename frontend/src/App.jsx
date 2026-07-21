@@ -7,6 +7,7 @@ const AGENT_META = {
   researcher: { emoji: "🔎", color: "#0891b2" },
   writer: { emoji: "✍️", color: "#ca8a04" },
   reviewer: { emoji: "🧐", color: "#dc2626" },
+
 };
 
 export default function App() {
@@ -58,6 +59,59 @@ export default function App() {
           {loading ? "Running crew..." : "Run Crew"}
         </button>
       </form>
+      
+      <section style={styles.aboutSection}>
+  <h2 style={styles.aboutTitle}>About AgentCrew</h2>
+
+  <p style={styles.aboutText}>
+    AgentCrew is an open-source multi-agent AI research assistant that
+    transforms a single topic into a structured, research-backed report
+    through collaboration between specialized AI agents.
+  </p>
+
+  <p style={styles.aboutText}>
+    Instead of relying on a single AI response, AgentCrew divides the task
+    among multiple agents, making the reasoning process transparent,
+    modular, and easier to understand.
+  </p>
+
+  <div style={styles.agentGrid}>
+    <div style={styles.agentCard}>
+      <span>🧭</span>
+      <strong>Planner</strong>
+      <p>Breaks the topic into a clear research plan.</p>
+    </div>
+
+    <div style={styles.agentCard}>
+      <span>🔎</span>
+      <strong>Researcher</strong>
+      <p>Collects relevant information and sources.</p>
+    </div>
+
+    <div style={styles.agentCard}>
+      <span>✍️</span>
+      <strong>Writer</strong>
+      <p>Creates a structured and readable report.</p>
+    </div>
+
+    <div style={styles.agentCard}>
+      <span>🧐</span>
+      <strong>Reviewer</strong>
+      <p>Reviews and improves the final output.</p>
+    </div>
+  </div>
+
+  <h3 style={styles.applicationTitle}>Real-World Applications</h3>
+
+  <ul style={styles.applicationList}>
+    <li>📚 Students preparing assignments and reports</li>
+    <li>🎓 Researchers exploring new topics</li>
+    <li>💼 Professionals creating research summaries</li>
+    <li>📰 Content writers gathering information</li>
+    <li>🚀 Developers learning multi-agent AI systems</li>
+    <li>🌐 Open-source contributors experimenting with LangGraph</li>
+  </ul>
+</section>
 
       {error && <div style={styles.error}>⚠️ {error}</div>}
 
@@ -178,4 +232,52 @@ const styles = {
   footerLink: { color: "#6366f1", textDecoration: "none" },
   footerDot: { color: "#ccc" },
   footerBuilt: { margin: 0, color: "#aaa" },
+
+  aboutSection: {
+  marginBottom: "2rem",
+  padding: "1.5rem",
+  border: "1px solid #e5e7eb",
+  borderRadius: 12,
+  background: "#fafafa",
+},
+
+aboutTitle: {
+  marginTop: 0,
+  marginBottom: "1.25rem",
+  fontSize: "1.6rem",
+},
+
+aboutText: {
+  color: "#4b5563",
+  lineHeight: 1.7,
+  marginBottom: "1rem",
+},
+
+agentGrid: {
+  display: "grid",
+  gridTemplateColumns: "repeat(auto-fit, minmax(170px, 1fr))",
+  gap: "1rem",
+  marginTop: "1.5rem",
+  marginBottom: "1.5rem",
+},
+
+agentCard: {
+  background: "#fff",
+  border: "1px solid #e5e7eb",
+  borderRadius: 10,
+  padding: "1rem",
+  textAlign: "center",
+  boxShadow: "0 2px 6px rgba(0,0,0,0.05)",
+},
+
+applicationTitle: {
+  marginBottom: "0.75rem",
+},
+
+applicationList: {
+  margin: 0,
+  paddingLeft: "1.2rem",
+  lineHeight: 1.9,
+  color: "#374151",
+},
 };
