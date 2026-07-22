@@ -73,3 +73,55 @@ def test_timeout_stops_long_hanging_call():
             call_llm("sys", "usr", max_tokens=1200)
 
     assert get_client.return_value.models.generate_content.call_count >= 1
+def test_retry_backoff_intervals():
+    sleep_calls = []
+
+    def fake_sleep(delay):
+        sleep_calls.append(delay)
+
+    with patch("app.agents._get_client") as get_client, \
+         patch("app.agents.time.sleep", side_effect=fake_sleep), \
+         patch("app.agents.settings") as mock_settings:
+
+        mock_settings.gemini_retry_attempts = 4
+        mock_settings.gemini_request_timeout = 1
+        mock_settings.gemini_backoff_base = 0.1
+        mock_settings.gemini_backoff_max = 0.25
+
+        get_client.return_value.models.generate_content.side_effect = TimeoutError("boom")
+
+        with pytest.raises(RuntimeError):
+            call_llm("sys", "usr")
+
+    assert sleep_calls == [0.1, 0.2, 0.25]
+def test_retry_backoff_sequence():
+    call_order = []
+
+    def fake_generate(*args, **kwargs):
+        call_order.append("request")
+        raise TimeoutError("boom")
+
+    def fake_sleep(delay):
+        call_order.append(f"sleep:{delay}")
+
+    with patch("app.agents._get_client") as get_client, \
+         patch("app.agents.time.sleep", side_effect=fake_sleep), \
+         patch("app.agents.settings") as mock_settings:
+
+        mock_settings.gemini_retry_attempts = 3
+        mock_settings.gemini_request_timeout = 1
+        mock_settings.gemini_backoff_base = 0.1
+        mock_settings.gemini_backoff_max = 1.0
+
+        get_client.return_value.models.generate_content.side_effect = fake_generate
+
+        with pytest.raises(RuntimeError):
+            call_llm("sys", "usr")
+
+    assert call_order == [
+        "request",
+        "sleep:0.1",
+        "request",
+        "sleep:0.2",
+        "request",
+    ]
