@@ -73,3 +73,39 @@ def test_timeout_stops_long_hanging_call():
             call_llm("sys", "usr", max_tokens=1200)
 
     assert get_client.return_value.models.generate_content.call_count >= 1
+class NoTextResponse:
+    pass
+
+
+def test_response_without_text_attribute():
+    with patch("app.agents._get_client") as get_client:
+        get_client.return_value.models.generate_content.return_value = NoTextResponse()
+
+        with pytest.raises(RuntimeError):
+            call_llm("sys", "usr")
+def test_none_text_response():
+    with patch("app.agents._get_client") as get_client:
+        get_client.return_value.models.generate_content.return_value = FakeResp(None)
+
+        result = call_llm("sys", "usr")
+
+    assert result == ""
+def test_empty_string_response():
+    with patch("app.agents._get_client") as get_client:
+        get_client.return_value.models.generate_content.return_value = FakeResp("")
+
+        result = call_llm("sys", "usr")
+
+    assert result == ""
+def test_null_response():
+    with patch("app.agents._get_client") as get_client:
+        get_client.return_value.models.generate_content.return_value = None
+
+        with pytest.raises(RuntimeError):
+            call_llm("sys", "usr")
+def test_malformed_response_object():
+    with patch("app.agents._get_client") as get_client:
+        get_client.return_value.models.generate_content.return_value = object()
+
+        with pytest.raises(RuntimeError):
+            call_llm("sys", "usr")
