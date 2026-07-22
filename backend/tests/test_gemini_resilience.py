@@ -73,3 +73,60 @@ def test_timeout_stops_long_hanging_call():
             call_llm("sys", "usr", max_tokens=1200)
 
     assert get_client.return_value.models.generate_content.call_count >= 1
+class FakeResp:
+    def __init__(self, text):
+        self.text = text
+
+def test_none_response_returns_empty_string():
+    with patch("app.agents._get_client") as get_client:
+        get_client.return_value.models.generate_content.return_value = FakeResp(None)
+
+        result = call_llm("sys", "usr")
+
+    assert result == ""
+def test_empty_response_returns_empty_string():
+    with patch("app.agents._get_client") as get_client:
+        get_client.return_value.models.generate_content.return_value = FakeResp("")
+
+        result = call_llm("sys", "usr")
+
+    assert result == ""
+class BadResponse:
+    pass
+
+def test_invalid_response_object():
+    with patch("app.agents._get_client") as get_client:
+        get_client.return_value.models.generate_content.return_value = BadResponse()
+
+        with pytest.raises(RuntimeError):
+            call_llm("sys", "usr")
+def test_retry_after_multiple_failures():
+    calls = {"n": 0}
+
+    def fake_generate(*args, **kwargs):
+        calls["n"] += 1
+        if calls["n"] < 3:
+            raise TimeoutError("boom")
+        return FakeResp("success")
+
+    with patch("app.agents._get_client") as get_client:
+        get_client.return_value.models.generate_content.side_effect = fake_generate
+
+        result = call_llm("sys", "usr")
+
+    assert result == "success"
+    assert calls["n"] == 3
+def test_unexpected_exception_fails_immediately():
+    with patch("app.agents._get_client") as get_client:
+        get_client.return_value.models.generate_content.side_effect = ValueError("bad")
+
+        with pytest.raises(RuntimeError):
+            call_llm("sys", "usr")
+
+    assert get_client.return_value.models.generate_content.call_count == 1
+def test_zero_retry_attempts():
+    with patch("app.agents.settings") as mock_settings:
+        mock_settings.gemini_retry_attempts = 0
+
+        with pytest.raises(RuntimeError):
+            call_llm("sys", "usr")
