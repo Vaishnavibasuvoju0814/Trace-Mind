@@ -9,16 +9,26 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from app.agents import call_llm
 
+@pytest.fixture
+def mock_client():
+    with patch("app.agents._get_client") as get_client:
+        yield get_client
 
+
+@pytest.fixture
+def mock_settings():
+    with patch("app.agents.settings") as settings:
+        yield settings
 class FakeResp:
     def __init__(self, text):
         self.text = text
 
 
-def test_successful_request():
-    with patch("app.agents._get_client") as get_client:
-        get_client.return_value.models.generate_content.return_value = FakeResp("ok")
-        result = call_llm("sys", "usr")
+def test_successful_request(mock_client):
+    mock_client.return_value.models.generate_content.return_value = FakeResp("ok")
+
+    result = call_llm("sys", "usr")
+
     assert result == "ok"
 
 
@@ -39,11 +49,11 @@ def test_retryable_then_success():
     assert calls["n"] == 2
 
 
-def test_retry_exhaustion():
-    with patch("app.agents._get_client") as get_client:
-        get_client.return_value.models.generate_content.side_effect = TimeoutError("boom")
-        with pytest.raises(RuntimeError) as exc_info:
-            call_llm("sys", "usr")
+def test_retry_exhaustion(mock_client):
+    mock_client.return_value.models.generate_content.side_effect = TimeoutError("boom")
+
+    with pytest.raises(RuntimeError) as exc_info:
+        call_llm("sys", "usr")
 
     assert "failed after" in str(exc_info.value)
 
@@ -62,8 +72,7 @@ def test_non_retryable_fails_fast():
 
 
 def test_timeout_stops_long_hanging_call():
-    with patch("app.agents._get_client") as get_client, \
-         patch("app.agents.settings") as mock_settings:
+    def test_timeout_stops_long_hanging_call(mock_client, mock_settings):
         mock_settings.gemini_retry_attempts = 2
         mock_settings.gemini_request_timeout = 0.1
         mock_settings.gemini_backoff_base = 0.01
