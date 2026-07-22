@@ -119,11 +119,11 @@ export default function App() {
       <footer style={styles.footer}>
         <div style={styles.footerLogo}>🤖 AgentCrew</div>
         <div style={styles.footerLinks}>
-          <a href="https://github.com/your-repo" style={styles.footerLink}>GitHub</a>
+          <a href="https://github.com/Deekshith-goud/agent-crew" style={styles.footerLink}>GitHub</a>
           <span style={styles.footerDot}>·</span>
-          <a href="https://github.com/your-repo/blob/main/LICENSE" style={styles.footerLink}>MIT License</a>
+          <a href="https://github.com/Deekshith-goud/agent-crew/blob/main/LICENSE" style={styles.footerLink}>MIT License</a>
           <span style={styles.footerDot}>·</span>
-          <a href="https://github.com/your-repo/graphs/contributors" style={styles.footerLink}>Contributors</a>
+          <a href="https://github.com/Deekshith-goud/agent-crew/graphs/contributors" style={styles.footerLink}>Contributors</a>
         </div>
         <p style={styles.footerBuilt}>Built with React · FastAPI · LangGraph · Gemini</p>
       </footer>
