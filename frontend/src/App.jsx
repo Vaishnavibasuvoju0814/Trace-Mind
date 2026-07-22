@@ -14,6 +14,11 @@ export default function App() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [result, setResult] = useState(null);
+  const [isNavOpen, setIsNavOpen] = useState(false);
+
+  const toggleNav = () => {
+    setIsNavOpen(!isNavOpen);
+  };
 
   async function handleSubmit(e) {
     e.preventDefault();
@@ -38,8 +43,26 @@ export default function App() {
   }
 
   return (
-    <div style={styles.page}>
-      <header style={styles.header}>
+    <>
+      <nav className="navbar">
+        <a href="#" className="nav-logo">
+          <span>🤖</span> AgentCrew
+        </a>
+        <button className="hamburger" onClick={toggleNav}>
+          {isNavOpen ? '✖' : '☰'}
+        </button>
+        <div className={`nav-links ${isNavOpen ? 'open' : ''}`}>
+          <a href="#home" className="nav-link active">Home</a>
+          <a href="#features" className="nav-link">Features</a>
+          <a href="#about" className="nav-link">About</a>
+          <a href="#usage" className="nav-link">Usage</a>
+          <a href="#faq" className="nav-link">FAQ</a>
+          <a href="https://github.com/Deekshith-goud/agent-crew" className="nav-link">GitHub</a>
+          <a href="#get-started" className="get-started-btn">Get Started</a>
+        </div>
+      </nav>
+      <div style={styles.page}>
+        <header style={styles.header}>
         <h1 style={styles.h1}>🤖 AgentCrew</h1>
         <p style={styles.subtitle}>
           A planner, researcher, writer, and reviewer agent collaborate to research your topic.
@@ -96,15 +119,16 @@ export default function App() {
       <footer style={styles.footer}>
         <div style={styles.footerLogo}>🤖 AgentCrew</div>
         <div style={styles.footerLinks}>
-          <a href="https://github.com/your-repo" style={styles.footerLink}>GitHub</a>
+          <a href="https://github.com/Deekshith-goud/agent-crew" style={styles.footerLink}>GitHub</a>
           <span style={styles.footerDot}>·</span>
-          <a href="https://github.com/your-repo/blob/main/LICENSE" style={styles.footerLink}>MIT License</a>
+          <a href="https://github.com/Deekshith-goud/agent-crew/blob/main/LICENSE" style={styles.footerLink}>MIT License</a>
           <span style={styles.footerDot}>·</span>
-          <a href="https://github.com/your-repo/graphs/contributors" style={styles.footerLink}>Contributors</a>
+          <a href="https://github.com/Deekshith-goud/agent-crew/graphs/contributors" style={styles.footerLink}>Contributors</a>
         </div>
         <p style={styles.footerBuilt}>Built with React · FastAPI · LangGraph · Gemini</p>
       </footer>
     </div>
+    </>
   );
 }
 
