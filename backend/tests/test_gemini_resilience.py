@@ -73,3 +73,50 @@ def test_timeout_stops_long_hanging_call():
             call_llm("sys", "usr", max_tokens=1200)
 
     assert get_client.return_value.models.generate_content.call_count >= 1
+def test_empty_system_prompt():
+    with patch("app.agents._get_client") as get_client:
+        get_client.return_value.models.generate_content.return_value = FakeResp("ok")
+
+        result = call_llm("", "user")
+
+    assert result == "ok"
+    assert get_client.return_value.models.generate_content.call_count == 1
+def test_empty_user_prompt():
+    with patch("app.agents._get_client") as get_client:
+        get_client.return_value.models.generate_content.return_value = FakeResp("ok")
+
+        result = call_llm("system", "")
+
+    assert result == "ok"
+    assert get_client.return_value.models.generate_content.call_count == 1
+def test_very_long_prompts():
+    system = "system " * 5000
+    user = "user " * 5000
+
+    with patch("app.agents._get_client") as get_client:
+        get_client.return_value.models.generate_content.return_value = FakeResp("ok")
+
+        result = call_llm(system, user)
+
+    assert result == "ok"
+    assert get_client.return_value.models.generate_content.call_count == 1
+def test_minimum_max_tokens():
+    with patch("app.agents._get_client") as get_client:
+        get_client.return_value.models.generate_content.return_value = FakeResp("ok")
+
+        result = call_llm("sys", "usr", max_tokens=1)
+
+    assert result == "ok"
+
+    config = get_client.return_value.models.generate_content.call_args.kwargs["config"]
+    assert config.max_output_tokens == 1
+def test_large_max_tokens():
+    with patch("app.agents._get_client") as get_client:
+        get_client.return_value.models.generate_content.return_value = FakeResp("ok")
+
+        result = call_llm("sys", "usr", max_tokens=100000)
+
+    assert result == "ok"
+
+    config = get_client.return_value.models.generate_content.call_args.kwargs["config"]
+    assert config.max_output_tokens == 100000
